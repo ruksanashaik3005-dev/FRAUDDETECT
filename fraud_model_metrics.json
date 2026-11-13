@@ -1,0 +1,28 @@
+{
+  "precision": 0.8456375838926175,
+  "recall": 0.9921259842519685,
+  "f1_score": 0.9130434782608695,
+  "roc_auc": 0.99940041663357,
+  "accuracy": 0.9925,
+  "confusion_matrix": [
+    [
+      3050,
+      23
+    ],
+    [
+      1,
+      126
+    ]
+  ],
+  "true_negative": 3050,
+  "false_positive": 23,
+  "false_negative": 1,
+  "true_positive": 126,
+  "false_positive_rate": 0.007484542792059876,
+  "false_negative_rate": 0.007874015748031496,
+  "evaluation_dataset": "synthetic_demo",
+  "threshold": 0.2395805035251983,
+  "validation_precision": 0.8503401360544217,
+  "validation_recall": 0.984251968503937,
+  "threshold_targets_met": 1.0
+}

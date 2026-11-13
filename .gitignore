@@ -1,0 +1,13 @@
+.venv/
+.env
+__pycache__/
+*.py[cod]
+fraud_model.pkl
+fraud_model_metrics.json
+fraud_detection.db
+fraud_test.db
+fraud_local.db
+fraud_training_reference.csv
+drift_report.json
+frontend/node_modules/
+frontend/dist/

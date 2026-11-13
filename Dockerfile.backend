@@ -1,0 +1,45 @@
+FROM python:3.12-slim AS dependencies
+
+ENV VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt ./
+RUN python -m venv "$VIRTUAL_ENV" \
+    && pip install --upgrade pip \
+    && pip install -r requirements.txt
+
+# Build a reproducible demo model and the training reference used by drift checks.
+COPY ml_pipeline.py ./
+RUN python ml_pipeline.py
+
+FROM python:3.12-slim AS runtime
+
+ENV VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:$PATH" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system frauddetect \
+    && useradd --system --gid frauddetect --create-home frauddetect \
+    && install -d --owner=frauddetect --group=frauddetect /app
+
+WORKDIR /app
+COPY --from=dependencies /opt/venv /opt/venv
+COPY --from=dependencies --chown=frauddetect:frauddetect /app/fraud_model.pkl ./fraud_model.pkl
+COPY --from=dependencies --chown=frauddetect:frauddetect /app/fraud_model_metrics.json ./fraud_model_metrics.json
+COPY --from=dependencies --chown=frauddetect:frauddetect /app/fraud_training_reference.csv ./fraud_training_reference.csv
+COPY --chown=frauddetect:frauddetect main.py models.py ml_pipeline.py monitor_drift.py ./
+
+USER frauddetect
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

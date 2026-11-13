@@ -1,0 +1,79 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-frauddect}
+      POSTGRES_USER: ${POSTGRES_USER:-frauddetect}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      - frauddetect
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER:-frauddetect}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-frauddect}"
+      FRAUDDETECT_JWT_SECRET: ${FRAUDDETECT_JWT_SECRET:?Set FRAUDDETECT_JWT_SECRET in .env}
+      FRAUDDETECT_API_KEY: ${FRAUDDETECT_API_KEY:?Set FRAUDDETECT_API_KEY in .env}
+      FRAUDDETECT_ADMIN_USERNAME: ${FRAUDDETECT_ADMIN_USERNAME:-admin}
+      FRAUDDETECT_ADMIN_PASSWORD: ${FRAUDDETECT_ADMIN_PASSWORD:?Set FRAUDDETECT_ADMIN_PASSWORD in .env}
+      DB_STARTUP_MAX_ATTEMPTS: ${DB_STARTUP_MAX_ATTEMPTS:-30}
+      DB_STARTUP_RETRY_SECONDS: ${DB_STARTUP_RETRY_SECONDS:-1}
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    networks:
+      - frauddetect
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRAUDDETECT_BIND_ADDRESS:-127.0.0.1}:${FRAUDDETECT_HTTP_PORT:-8080}:80"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://127.0.0.1/
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - frauddetect
+    restart: unless-stopped
+
+networks:
+  frauddetect:
+    driver: bridge
+    internal: true
+
+volumes:
+  postgres_data:
