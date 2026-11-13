@@ -181,6 +181,10 @@ preload/fallback image.
   windows, and pagination.
 - Alerts support severity/date/search filters, investigation notes, status
   updates, and history. Block/resolve actions require an administrator.
+- Administrators can activate or disable accounts and delete login accounts
+  from Settings. Disabled accounts cannot sign in; deleting an account keeps
+  existing transaction and audit history. The signed-in admin and last active
+  admin cannot be disabled or deleted.
 - Analytics are calculated from stored transactions and alerts. Model holdout
   metrics are labeled synthetic; production metrics are shown only when
   adjudicated outcomes have been recorded.

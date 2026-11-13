@@ -21,6 +21,7 @@ from fastapi import (
     FastAPI,
     HTTPException,
     Query,
+    Response,
     Security,
     status,
     WebSocket,
@@ -422,7 +423,7 @@ app.add_middleware(
     allow_origins=os.getenv(
         "FRONTEND_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
     ).split(","),
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-API-Key"],
 )
 
@@ -1552,6 +1553,43 @@ def update_user(
     )
     db.commit()
     return {"username": user.username, "role": user.role, "is_active": user.is_active}
+
+
+@app.delete("/api/users/{username}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    username: str,
+    current_user: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session, Depends(get_db)],
+) -> Response:
+    user = db.scalar(select(User).where(User.username == username))
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+    if user.role == "admin" and user.is_active:
+        active_admins = db.scalar(
+            select(func.count()).select_from(User).where(
+                User.role == "admin",
+                User.is_active.is_(True),
+                User.id != user.id,
+            )
+        )
+        if not active_admins:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one active administrator is required",
+            )
+    _record_activity(
+        db,
+        current_user.username,
+        "user_admin_delete",
+        f"Account {username} deleted",
+        severity="Warning",
+        details={"username": username, "role": user.role, "was_active": user.is_active},
+    )
+    db.delete(user)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @app.post("/api/testing/run")
